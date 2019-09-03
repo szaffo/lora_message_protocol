@@ -57,7 +57,7 @@ class Queue(object):
 
 
 class Buffer(Queue):
-    # Buffer only takes Sendable objects
+    # Buffer only takes Sendable objects or it's children
     pass
 
 # <---------------------------------------------------------------------------------->
@@ -77,6 +77,43 @@ class Sendable(object):
         return "Sendable(sender={}, target={}, actionCode={})".format(
             self._header.value[1], self._header.value[2], self._header.value[3]
         )
+
+    @property
+    def header(self):
+        return self._header
+
+
+# <---------------------------------------------------------------------------------->
+
+
+class Message(Sendable):
+
+    def __init__(self, sender, target, actionCode, message):
+        if len(message) > 255:
+            raise MessageLengthError()
+
+        self._header = Header(len(message), sender, target, actionCode)
+        self._body = str(message)
+
+    def __str__(self):
+        return "<Message [{}]{}".format(str(self._header), self._body)
+
+    def __repr__(self):
+        return "Message(sender={}, target={}, actionCode={}, message=\"{}\")".format(
+            self._header.value[1], self._header.value[2], self._header.value[3], self.body
+        )
+
+    @property
+    def header(self):
+        return self._header
+
+    @property
+    def body(self):
+        return self._body
+
+# <---------------------------------------------------------------------------------->
+class Bundle(Sendable):
+    pass
 
 # <---------------------------------------------------------------------------------->
 
@@ -99,7 +136,7 @@ class Header(object):
             raise ValueOutOfByteRange()
 
     def __str__(self):
-        return "<Header {}>".format(self._data.decode())
+        return "<Header {}>".format(list(self._data))
 
     def __repr__(self):
         return "Header(length={}, sender={}, target={}, actionCode={})".format(
@@ -129,4 +166,10 @@ class ValueNotInteger(Exception):
 
 
 class ValueOutOfByteRange(Exception):
+    pass
+
+# <---------------------------------------------------------------------------------->
+
+
+class MessageLengthError(Exception):
     pass
