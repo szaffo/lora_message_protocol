@@ -1,4 +1,6 @@
 import serial
+
+# <---------------------------------------------------------------------------------->
 # Classes
 
 
@@ -51,10 +53,14 @@ class Queue(object):
     def isEmpty(self):
         return self.size == 0
 
+# <---------------------------------------------------------------------------------->
+
 
 class Buffer(Queue):
     # Buffer only takes Sendable objects
     pass
+
+# <---------------------------------------------------------------------------------->
 
 
 class Sendable(object):
@@ -71,6 +77,8 @@ class Sendable(object):
         return "Sendable(sender={}, target={}, actionCode={})".format(
             self._header.value[1], self._header.value[2], self._header.value[3]
         )
+
+# <---------------------------------------------------------------------------------->
 
 
 class Header(object):
@@ -101,6 +109,7 @@ class Header(object):
     def value(self):
         return self._data
 
+# <---------------------------------------------------------------------------------->
 
 # Exceptions
 
@@ -111,6 +120,8 @@ class QueueNonMatchingType(Exception):
 
 class QueueIsEmpty(Exception):
     pass
+
+# <---------------------------------------------------------------------------------->
 
 
 class ValueNotInteger(Exception):
