@@ -1,16 +1,4 @@
 import serial
-
-# Exceptions for Queue
-
-
-class QueueNonMatchingType(Exception):
-    pass
-
-
-class QueueIsEmpty(Exception):
-    pass
-
-
 # Classes
 
 
