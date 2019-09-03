@@ -50,3 +50,72 @@ class Queue(object):
 
     def isEmpty(self):
         return self.size == 0
+
+
+class Buffer(Queue):
+    # Buffer only takes Sendable objects
+    pass
+
+
+class Sendable(object):
+    # Connection handler can send only Sendable objects
+    # Sendable has no message
+
+    def __init__(self, sender, target, actionCode):
+        self._header = Header(0, sender, target, actionCode)
+
+    def __str__(self):
+        return "<Sendable [{}]".format(str(self._header))
+
+    def __repr__(self):
+        return "Sendable(sender={}, target={}, actionCode={})".format(
+            self._header.value[1], self._header.value[2], self._header.value[3]
+        )
+
+
+class Header(object):
+    # Header of Sendables
+
+    def __init__(self, length, sender, target, actionCode):
+        self._data = bytearray(4)
+
+        try:
+            self._data[0] = length
+            self._data[1] = sender
+            self._data[2] = target
+            self._data[3] = actionCode
+        except TypeError as e:
+            raise ValueNotInteger()
+
+        except ValueError as e:
+            raise ValueOutOfByteRange()
+
+    def __str__(self):
+        return "<Header {}>".format(self._data.decode())
+
+    def __repr__(self):
+        return "Header(length={}, sender={}, target={}, actionCode={})".format(
+            self._data[0], self._data[1], self._data[2], self._data[3])
+
+    @property
+    def value(self):
+        return self._data
+
+
+# Exceptions
+
+
+class QueueNonMatchingType(Exception):
+    pass
+
+
+class QueueIsEmpty(Exception):
+    pass
+
+
+class ValueNotInteger(Exception):
+    pass
+
+
+class ValueOutOfByteRange(Exception):
+    pass
