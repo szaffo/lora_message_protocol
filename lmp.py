@@ -170,9 +170,14 @@ class Sendable(object):
     def header(self):
         return self._header
 
+    def encode(self):
+        return b"" + self.header.value + self.body.encode()
+
+    @property
+    def byteSize(self):
+        return len(self.encode())
 
 # <---------------------------------------------------------------------------------->
-
 
 class Message(Sendable):
 
@@ -180,7 +185,7 @@ class Message(Sendable):
         message = str(message)
 
         if len(message) > 255:
-            raise MessageLengthError()
+            raise OversizedMessageError()
 
         self._header = Header(len(message), sender, target, actionCode)
         self._body = message
@@ -206,7 +211,10 @@ class Bundle(Sendable):
     def __init__(self, sender, target, code, message):
         self._data = Queue(Message)
 
-        messages = textwrap.wrap(message)
+        messages = textwrap.wrap(message, 255)
+        if len(messages) > 255:
+            raise OversizedMessageError()
+
         header = Message(sender, target, BUNDLE_HEADER_CODE, len(messages))
 
         self._data.insert(header)
@@ -238,12 +246,18 @@ class Bundle(Sendable):
         for element in self.data[1:]:
             string += element.body
         return string
-    
+
     @property
     def size(self):
         return len(self.data)
-    
-    
+
+    def encode(self):
+        string = b""
+
+        for element in self.data:
+            string += element.encode()
+
+        return string
 
 
 # <---------------------------------------------------------------------------------->
@@ -307,7 +321,7 @@ class ValueOutOfByteRange(Exception):
 # <---------------------------------------------------------------------------------->
 
 
-class MessageLengthError(Exception):
+class OversizedMessageError(Exception):
     pass
 
 # <---------------------------------------------------------------------------------->
