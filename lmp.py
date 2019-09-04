@@ -84,7 +84,7 @@ class Dequeue(Queue):
 # <---------------------------------------------------------------------------------->
 
 
-class Buffer(Queue):
+class Buffer(Dequeue):
     # Buffer only takes Sendable objects or it's children
 
     def __init__(self, initData=None):
