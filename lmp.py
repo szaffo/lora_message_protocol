@@ -16,10 +16,10 @@ class Queue(object):
                 self.insert(element)
 
     def __str__(self):
-        return "<" + self.__class__.__name__ + " of {} with size {}>".format(self.type, self.size)
+        return "<" + self.__class__.__name__ + " of {} with size {}>".format(self.type.__name__, self.size)
 
     def __repr__(self):
-        return self.__class__.__name__ + "(type={}, initData={})".format(self.type, self._data)
+        return self.__class__.__name__ + "(type={}, initData={})".format(self.type.__name__, self._data)
 
     @property
     def size(self):
@@ -54,17 +54,18 @@ class Queue(object):
         return self.size == 0
 
 # <---------------------------------------------------------------------------------->
+
+
 class Dequeue(Queue):
     # It's a double-ended queue
     # It is capable to add element to front of the queue and
     # remove last from queue
 
     def insertFirst(self, element):
-
         if not issubclass(type(element), self.type):
             raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
 
-        self._data.insert(0,element)
+        self._data.insert(0, element)
 
     def peekLast(self):
         if self.size == 0:
@@ -85,7 +86,16 @@ class Dequeue(Queue):
 
 class Buffer(Queue):
     # Buffer only takes Sendable objects or it's children
-    pass
+
+    def __init__(self, initData=None):
+        super().__init__(Sendable)
+
+        if initData != None:
+            for element in initData:
+                self.insert(element)
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(initData={})".format(self._data)
 
 # <---------------------------------------------------------------------------------->
 
@@ -137,6 +147,8 @@ class Message(Sendable):
         return self._body
 
 # <---------------------------------------------------------------------------------->
+
+
 class Bundle(Sendable):
     pass
 
