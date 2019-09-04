@@ -1,5 +1,22 @@
 import serial
+import textwrap
 
+'''
+    This protocol can operate with action codes up to 255
+
+    The first 32 is used by the protocol. The others defined by the interfaces.
+
+    First 32 code:
+          1 - Basic text
+          2 - Bundle header code
+          3 - Asking who got the signal
+          4 - Answer to asking signal
+
+'''
+
+# <---------------------------------------------------------------------------------->
+# Constans
+BUNDLE_HEADER_CODE = 2
 # <---------------------------------------------------------------------------------->
 # Classes
 
@@ -28,6 +45,10 @@ class Queue(object):
     @property
     def type(self):
         return self._type
+
+    @property
+    def data(self):
+        return self._data.copy()
 
     def insert(self, element):
 
@@ -102,10 +123,6 @@ class Buffer(Dequeue):
 
 class TransparentBuffer(Buffer):
 
-    @property
-    def data(self):
-        return self._data.copy()
-
     def peekCode(self, code):
         if self.hasCode(code):
             filtered = filter(lambda elem: elem.header.code == code, self.data)
@@ -160,11 +177,13 @@ class Sendable(object):
 class Message(Sendable):
 
     def __init__(self, sender, target, actionCode, message):
+        message = str(message)
+
         if len(message) > 255:
             raise MessageLengthError()
 
         self._header = Header(len(message), sender, target, actionCode)
-        self._body = str(message)
+        self._body = message
 
     def __repr__(self):
         return self.__class__.__name__ + "(sender={}, target={}, actionCode={}, message=\"{}\")".format(
@@ -183,7 +202,49 @@ class Message(Sendable):
 
 
 class Bundle(Sendable):
-    pass
+
+    def __init__(self, sender, target, code, message):
+        self._data = Queue(Message)
+
+        messages = textwrap.wrap(message)
+        header = Message(sender, target, BUNDLE_HEADER_CODE, len(messages))
+
+        self._data.insert(header)
+
+        for line in messages:
+            element = Message(sender, target, code, line)
+            self._data.insert(element)
+
+    def __str__(self):
+        return "<" + self.__class__.__name__ + " [{}]".format(str(self.header))
+
+    def __repr__(self):
+        return self.__class__.__name__ + "(sender={}, target={}, actionCode={}, message=\"{}\")".format(
+            self.header.header.value[1], self.header.header.value[2], self.header.header.value[3], self.fullMessage
+        )
+
+    @property
+    def data(self):
+        return self._data.data
+
+    @property
+    def header(self):
+        return self.data[0]
+
+    @property
+    def fullMessage(self):
+        string = ""
+
+        for element in self.data[1:]:
+            string += element.body
+        return string
+    
+    @property
+    def size(self):
+        return len(self.data)
+    
+    
+
 
 # <---------------------------------------------------------------------------------->
 
