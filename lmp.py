@@ -31,7 +31,7 @@ class Queue(object):
 
     def insert(self, element):
 
-        if type(element) != self.type:
+        if not issubclass(type(element), self.type):
             raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
 
         self._data.append(element)
@@ -61,7 +61,7 @@ class Dequeue(Queue):
 
     def insertFirst(self, element):
 
-        if type(element) != self.type:
+        if not issubclass(type(element), self.type):
             raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
 
         self._data.insert(0,element)
