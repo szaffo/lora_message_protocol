@@ -16,10 +16,10 @@ class Queue(object):
                 self.insert(element)
 
     def __str__(self):
-        return "<Queue of {} with size {}>".format(self.type, self.size)
+        return "<" + self.__class__.__name__ + " of {} with size {}>".format(self.type, self.size)
 
     def __repr__(self):
-        return "Queue(type={}, initData={})".format(self.type, self._data)
+        return self.__class__.__name__ + "(type={}, initData={})".format(self.type, self._data)
 
     @property
     def size(self):
@@ -54,6 +54,33 @@ class Queue(object):
         return self.size == 0
 
 # <---------------------------------------------------------------------------------->
+class Dequeue(Queue):
+    # It's a double-ended queue
+    # It is capable to add element to front of the queue and
+    # remove last from queue
+
+    def insertFirst(self, element):
+
+        if type(element) != self.type:
+            raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
+
+        self._data.insert(0,element)
+
+    def peekLast(self):
+        if self.size == 0:
+            raise QueueIsEmpty()
+
+        return self._data[self.size - 1]
+
+    def popLast(self):
+        if self.size == 0:
+            raise QueueIsEmpty()
+
+        element = self._data.pop(self.size - 1)
+
+        return element
+
+# <---------------------------------------------------------------------------------->
 
 
 class Buffer(Queue):
@@ -69,12 +96,13 @@ class Sendable(object):
 
     def __init__(self, sender, target, actionCode):
         self._header = Header(0, sender, target, actionCode)
+        self._body = ""
 
     def __str__(self):
-        return "<Sendable [{}]".format(str(self._header))
+        return "<" + self.__class__.__name__ + " [{}]{}".format(str(self._header), self._body)
 
     def __repr__(self):
-        return "Sendable(sender={}, target={}, actionCode={})".format(
+        return self.__class__.__name__ + "(sender={}, target={}, actionCode={})".format(
             self._header.value[1], self._header.value[2], self._header.value[3]
         )
 
@@ -95,11 +123,8 @@ class Message(Sendable):
         self._header = Header(len(message), sender, target, actionCode)
         self._body = str(message)
 
-    def __str__(self):
-        return "<Message [{}]{}".format(str(self._header), self._body)
-
     def __repr__(self):
-        return "Message(sender={}, target={}, actionCode={}, message=\"{}\")".format(
+        return self.__class__.__name__ + "(sender={}, target={}, actionCode={}, message=\"{}\")".format(
             self._header.value[1], self._header.value[2], self._header.value[3], self.body
         )
 
@@ -136,10 +161,10 @@ class Header(object):
             raise ValueOutOfByteRange()
 
     def __str__(self):
-        return "<Header {}>".format(list(self._data))
+        return "<" + self.__class__.__name__ + " {}>".format(list(self._data))
 
     def __repr__(self):
-        return "Header(length={}, sender={}, target={}, actionCode={})".format(
+        return self.__class__.__name__ + "(length={}, sender={}, target={}, actionCode={})".format(
             self._data[0], self._data[1], self._data[2], self._data[3])
 
     @property
