@@ -100,6 +100,39 @@ class Buffer(Dequeue):
 # <---------------------------------------------------------------------------------->
 
 
+class TransparentBuffer(Buffer):
+
+    @property
+    def data(self):
+        return self._data.copy()
+
+    def peekCode(self, code):
+        if self.hasCode(code):
+            filtered = filter(lambda elem: elem.header.code == code, self.data)
+            return next(filtered)
+
+        else:
+            raise TransparentBufferNotContainsError()
+
+    def hasCode(self, code):
+        filtered = filter(lambda elem: elem.header.code == code, self.data)
+
+        try:
+            element = next(filtered)
+            return True
+        except StopIteration as e:
+            return False
+
+    def popCode(self, code):
+        if self.hasCode(code):
+            element = self._data.pop(self._data.index(self.peekCode(code)))
+            return element
+        else:
+            raise TransparentBufferNotContainsError()
+
+# <---------------------------------------------------------------------------------->
+
+
 class Sendable(object):
     # Connection handler can send only Sendable objects
     # Sendable has no message
@@ -183,6 +216,11 @@ class Header(object):
     def value(self):
         return self._data
 
+    @property
+    def code(self):
+        return self.value[3]
+
+
 # <---------------------------------------------------------------------------------->
 
 # Exceptions
@@ -209,4 +247,10 @@ class ValueOutOfByteRange(Exception):
 
 
 class MessageLengthError(Exception):
+    pass
+
+# <---------------------------------------------------------------------------------->
+
+
+class TransparentBufferNotContainsError(Exception):
     pass
