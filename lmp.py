@@ -1,5 +1,6 @@
 import serial
 import textwrap
+import time
 
 '''
     This protocol can operate with action codes up to 255
@@ -17,6 +18,8 @@ import textwrap
 # <---------------------------------------------------------------------------------->
 # Constans
 BUNDLE_HEADER_CODE = 2
+BIT_PER_SEC = 1200
+BUFFER_SIZE = 512
 # <---------------------------------------------------------------------------------->
 # Classes
 
@@ -295,6 +298,31 @@ class Header(object):
     def code(self):
         return self.value[3]
 
+
+# <---------------------------------------------------------------------------------->
+class FlowControlledSerial(serial.Serial):
+    def write(self, data):
+        counter = 0
+        splitted = self.splitByteString(data)
+
+        for current in splitted:
+            wTime = len(current) * 8 / BIT_PER_SEC
+
+            counter += super().write(current)
+
+            time.sleep(wTime + 0.0002)
+
+        return counter
+
+
+
+    def splitByteString(self, input):
+        data = []
+
+        for index in range(0, len(input), BUFFER_SIZE):
+            data.append(input[index: index + BUFFER_SIZE])
+
+        return data
 
 # <---------------------------------------------------------------------------------->
 
