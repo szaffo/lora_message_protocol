@@ -381,6 +381,50 @@ class FlowControlledSerial(Serial):
 
 # <---------------------------------------------------------------------------------->
 
+
+class Connection(object):
+
+    def __init__(self, con):
+
+        if not issubclass(type(con), Serial):
+            raise NotSerialError("Excepted a Serial object from this library")
+
+        self._serial = con
+
+        self._received = TransparentBuffer()
+
+    def _continousRead(self):
+        while True:
+            header = self._readHeader()
+            body = self._readBody(header)
+
+            if len(body) < header.length:
+                msg = BrokenMessage.joinHeaderWithBody(header, body)
+            else:
+                msg = Message.joinHeaderWithBody(header, body)
+
+            if msg.code in range(PROTOCOL_CODE_FIRST, PROTOCOL_CODE_LAST + 1):
+                self._handleProtocoleMessage(msg)
+            else:
+                self._received.insert(msg)
+
+    def _readHeader(self):
+        self._serial.timeout = None
+        rawHeader = self._serial.read(4)
+        header = Header.unpack(rawHeader)
+        return header
+
+    def _readBody(self, header):
+        length = header.length
+        timeout = length * 8 / BIT_PER_SEC
+        self._serial.timeout = timeout
+
+        rawBody = self._serial.read(length)
+        body = rawBody.decode()
+        return body
+
+# <---------------------------------------------------------------------------------->
+
 # Exceptions
 
 
