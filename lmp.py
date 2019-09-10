@@ -328,8 +328,24 @@ class Header(object):
         return self._data
 
     @property
+    def length(self):
+        return self.value[0]
+
+    @property
+    def sender(self):
+        return self.value[1]
+
+    @property
+    def target(self):
+        return self.value[2]
+
+    @property
     def code(self):
         return self.value[3]
+
+    @classmethod
+    def unpack(cls, data):
+        return cls(data[0], data[1], data[2], data[3])
 
 
 # <---------------------------------------------------------------------------------->
