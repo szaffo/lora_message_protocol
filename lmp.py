@@ -17,9 +17,11 @@ import time
 
 # <---------------------------------------------------------------------------------->
 # Constans
-BUNDLE_HEADER_CODE = 2
 BIT_PER_SEC = 300
 BUFFER_SIZE = 512
+PROTOCOL_CODE_FIRST = 0
+PROTOCOL_CODE_LAST = 31
+BUNDLE_HEADER_CODE = 2
 # <---------------------------------------------------------------------------------->
 # Classes
 
