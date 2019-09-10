@@ -248,6 +248,7 @@ class Bundle(Sendable):
         self._data = Queue(Message)
 
         messages = textwrap.wrap(message, 255)
+
         if len(messages) > 255:
             raise OversizedMessageError()
 
@@ -455,4 +456,8 @@ class OversizedMessageError(Exception):
 
 
 class TransparentBufferNotContainsError(Exception):
+    pass
+
+
+class NotSerialError(Exception):
     pass
