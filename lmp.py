@@ -18,7 +18,7 @@ import time
 # <---------------------------------------------------------------------------------->
 # Constans
 BUNDLE_HEADER_CODE = 2
-BIT_PER_SEC = 1200
+BIT_PER_SEC = 300
 BUFFER_SIZE = 512
 # <---------------------------------------------------------------------------------->
 # Classes
@@ -182,6 +182,7 @@ class Sendable(object):
 
 # <---------------------------------------------------------------------------------->
 
+
 class Message(Sendable):
 
     def __init__(self, sender, target, actionCode, message):
@@ -300,7 +301,15 @@ class Header(object):
 
 
 # <---------------------------------------------------------------------------------->
-class FlowControlledSerial(serial.Serial):
+
+class Serial(serial.Serial):
+    pass
+
+# <---------------------------------------------------------------------------------->
+
+
+class FlowControlledSerial(Serial):
+
     def write(self, data):
         counter = 0
         splitted = self.splitByteString(data)
@@ -310,11 +319,9 @@ class FlowControlledSerial(serial.Serial):
 
             counter += super().write(current)
 
-            time.sleep(wTime + 0.0002)
+            time.sleep(wTime)
 
         return counter
-
-
 
     def splitByteString(self, input):
         data = []
