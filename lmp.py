@@ -19,8 +19,7 @@ import time
 # Constans
 BIT_PER_SEC = 300
 BUFFER_SIZE = 512
-PROTOCOL_CODE_FIRST = 0
-PROTOCOL_CODE_LAST = 31
+PROTOCOL_CODES_NUM = 32
 BUNDLE_HEADER_CODE = 2
 # <---------------------------------------------------------------------------------->
 # Classes
@@ -394,8 +393,10 @@ class Connection(object):
 
         self._received = TransparentBuffer()
 
-    def _continousRead(self):
-        while True:
+    # def _continousRead(self):
+    def _readMessage(self, num):
+        messages = []
+        while num:
             header = self._readHeader()
             body = self._readBody(header)
 
@@ -404,10 +405,9 @@ class Connection(object):
             else:
                 msg = Message.joinHeaderWithBody(header, body)
 
-            if msg.code in range(PROTOCOL_CODE_FIRST, PROTOCOL_CODE_LAST + 1):
-                self._handleProtocoleMessage(msg)
-            else:
-                self._received.insert(msg)
+            messages.append(msg)
+
+            num -= 1
 
     def _readHeader(self):
         self._serial.timeout = None
@@ -423,6 +423,57 @@ class Connection(object):
         rawBody = self._serial.read(length)
         body = rawBody.decode()
         return body
+
+# <---------------------------------------------------------------------------------->
+class TaskManager(object):
+
+    def __init__(self):
+        self._placeholder = lambda msg: None
+        self._slots = [self._placeholder for x in range(255)]
+
+    def __call__(self, slotnum, arg, connection):
+        try:
+            if not (slotnum in range(255)):
+                raise  IndexError("Slots are available from 0-254")
+
+            self._slots[slotnum](arg, connection)
+        except Exception as e:
+            pass
+            # Logging comes here later
+
+    def attachSlot(self, slotnum, func):
+        if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
+            raise  IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+
+        if not callable(func):
+            raise TaskNotCallableError()
+
+        if self._slots[slotnum] == self._placeholder:
+            self._slots[slotnum] = func
+        else:
+            raise SlotAlreadyUsedError()
+
+    def detachSlot(self, slotnum):
+        if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
+            raise  IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+        
+        if self._slots[slotnum] == self._placeholder:
+            raise EmptySlotError()
+        else:
+            self._slots[slotnum] = self._placeholder
+
+    def isUsed(self, slotnum):
+        if not (slotnum in range(255)):
+            raise  IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
+
+        return not (self._slots[slotnum] == self._placeholder)
+
+    def __str__(self):
+        return "<" + self.__class__.__name__ + ">"
+
+    def __repr__(self):
+        return self.__class__.__name__ + "()"
+
 
 # <---------------------------------------------------------------------------------->
 
@@ -458,6 +509,19 @@ class OversizedMessageError(Exception):
 class TransparentBufferNotContainsError(Exception):
     pass
 
+# <---------------------------------------------------------------------------------->
 
 class NotSerialError(Exception):
+    pass
+
+# <---------------------------------------------------------------------------------->
+
+class TaskNotCallableError(Exception):
+    pass
+
+
+class SlotAlreadyUsedError(Exception):
+    pass
+
+class EmptySlotErro(Exception):
     pass
