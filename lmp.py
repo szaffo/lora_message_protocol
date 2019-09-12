@@ -1,6 +1,7 @@
 import serial
 import textwrap
 import time
+import threading
 
 '''
     This protocol can operate with action codes up to 255
@@ -21,6 +22,9 @@ BIT_PER_SEC = 300
 BUFFER_SIZE = 512
 PROTOCOL_CODES_NUM = 32
 BUNDLE_HEADER_CODE = 2
+
+# Logger function
+log = print
 # <---------------------------------------------------------------------------------->
 # Classes
 
@@ -161,6 +165,7 @@ class Sendable(object):
     def __init__(self, sender, target, actionCode):
         self._header = Header(0, sender, target, actionCode)
         self._body = ""
+        self._encodedBody = b""
 
     def __str__(self):
         return "<" + self.__class__.__name__ + " [{}]{}".format(str(self._header), self._body)
@@ -175,25 +180,31 @@ class Sendable(object):
         return self._header
 
     def encode(self):
-        return b"" + self.header.value + self.body.encode()
+        return b"" + self.header.value + self._encodedBody
 
     @property
     def byteSize(self):
-        return len(self.encode())
+        return len(self.encode("ascii", "replace"))
 
 # <---------------------------------------------------------------------------------->
 
 
 class Message(Sendable):
 
-    def __init__(self, sender, target, actionCode, message):
+    def __init__(self, sender, target, actionCode, message, messageLength=None):
         message = str(message)
 
         if len(message) > 255:
-            raise OversizedMessageError()
+            raise OversizedMessageError("Message can contain only 255 characters")
 
-        self._header = Header(len(message), sender, target, actionCode)
+        try:
+            length = len(message) if messageLength == None else int(messageLength)
+        except ValueError as e:
+            raise ValueError("Message length must be convertable to int")
+
+        self._header = Header(length, sender, target, actionCode)
         self._body = message
+        self._encodedBody = message.encode("ascii", "replace")
 
     def __repr__(self):
         return self.__class__.__name__ + "(sender={}, target={}, actionCode={}, message=\"{}\")".format(
@@ -206,6 +217,7 @@ class Message(Sendable):
 
     @property
     def body(self):
+        # Body stored as string, not bytestring
         return self._body
 
     @property
@@ -226,7 +238,7 @@ class Message(Sendable):
 
     @classmethod
     def joinHeaderWithBody(cls, header, body):
-        return cls(header[1], header[2], header[3], body)
+        return cls(header.value[1], header.value[2], header.value[3], body, header.value[0])
 
 # <---------------------------------------------------------------------------------->
 
@@ -236,6 +248,10 @@ class BrokenMessage(Message):
     @property
     def brokenLength(self):
         return len(self._body)
+
+    @property
+    def body(self):
+        return super().body + ("%" * (self.length - self.brokenLength))
 
 
 # <---------------------------------------------------------------------------------->
@@ -249,7 +265,7 @@ class Bundle(Sendable):
         messages = textwrap.wrap(message, 255)
 
         if len(messages) > 255:
-            raise OversizedMessageError()
+            raise OversizedMessageError("Bundle can contain only 65025 characters")
 
         header = Message(sender, target, BUNDLE_HEADER_CODE, len(messages))
 
@@ -294,6 +310,20 @@ class Bundle(Sendable):
             string += element.encode()
 
         return string
+
+    @classmethod
+    def joinMessages(cls, headerMessage, bodyMessages):
+        code = bodyMessages[0].code
+        sender = bodyMessages[0].sender
+        target = bodyMessages[0].target
+
+        bundle = cls(sender, target, code, "")
+
+        # WARNING This classmethod manipulates the object's private
+        # data directly
+        [bundle._data.insert(msg) for msg in bodyMessages]
+
+        return bundle
 
 
 # <---------------------------------------------------------------------------------->
@@ -393,7 +423,35 @@ class Connection(object):
 
         self._received = TransparentBuffer()
 
-    # def _continousRead(self):
+        self.receiverThread = threading.Thread(target=self._continousReadGate, 
+            name="Receiver thread reading from {}".format(self._serial.port),
+            daemon=True)
+
+        self.receiverThread.start()
+
+    def _continousReadGate(self):
+        try:
+            self._continousRead()
+        except Exception as e:
+            log(e)
+
+    def _continousRead(self):
+        while True:
+            msg = self._readMessage(1)[0]
+
+            if msg.code == BUNDLE_HEADER_CODE:
+                messages = self._readBundleBody(msg)
+                # Make bundle from mesages
+                sendable = Bundle.joinMessages(msg, messages)
+            else:
+                sendable = msg
+
+            self._received.insert(sendable) 
+
+    def _readBundleBody(self, headerMessage):
+        data = self._readMessage(int(headerMessage.body))
+        return data
+
     def _readMessage(self, num):
         messages = []
         while num:
@@ -409,6 +467,8 @@ class Connection(object):
 
             num -= 1
 
+        return messages
+
     def _readHeader(self):
         self._serial.timeout = None
         rawHeader = self._serial.read(4)
@@ -421,10 +481,12 @@ class Connection(object):
         self._serial.timeout = timeout
 
         rawBody = self._serial.read(length)
-        body = rawBody.decode()
+        body = rawBody.decode("ascii", "replace")
         return body
 
 # <---------------------------------------------------------------------------------->
+
+
 class TaskManager(object):
 
     def __init__(self):
@@ -434,7 +496,7 @@ class TaskManager(object):
     def __call__(self, slotnum, arg, connection):
         try:
             if not (slotnum in range(255)):
-                raise  IndexError("Slots are available from 0-254")
+                raise IndexError("Slots are available from 0-254")
 
             self._slots[slotnum](arg, connection)
         except Exception as e:
@@ -443,7 +505,7 @@ class TaskManager(object):
 
     def attachSlot(self, slotnum, func):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
-            raise  IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+            raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
 
         if not callable(func):
             raise TaskNotCallableError()
@@ -455,8 +517,8 @@ class TaskManager(object):
 
     def detachSlot(self, slotnum):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
-            raise  IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
-        
+            raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+
         if self._slots[slotnum] == self._placeholder:
             raise EmptySlotError()
         else:
@@ -464,7 +526,7 @@ class TaskManager(object):
 
     def isUsed(self, slotnum):
         if not (slotnum in range(255)):
-            raise  IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
+            raise IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
 
         return not (self._slots[slotnum] == self._placeholder)
 
@@ -511,10 +573,12 @@ class TransparentBufferNotContainsError(Exception):
 
 # <---------------------------------------------------------------------------------->
 
+
 class NotSerialError(Exception):
     pass
 
 # <---------------------------------------------------------------------------------->
+
 
 class TaskNotCallableError(Exception):
     pass
@@ -522,6 +586,7 @@ class TaskNotCallableError(Exception):
 
 class SlotAlreadyUsedError(Exception):
     pass
+
 
 class EmptySlotErro(Exception):
     pass
