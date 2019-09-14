@@ -280,19 +280,25 @@ class Bundle(Sendable):
 
     def __repr__(self):
         return self.__class__.__name__ + "(sender={}, target={}, actionCode={}, message=\"{}\")".format(
-            self.header.header.value[1], self.header.header.value[2], self.header.header.value[3], self.fullMessage
+            self.header.header.value[1], self.header.header.value[2], self.header.header.value[3], self.body
         )
 
     @property
     def data(self):
+        # self._data is queue
         return self._data.data
+
+    @property
+    def code(self):
+        return self.data[1].code
+    
 
     @property
     def header(self):
         return self.data[0]
 
     @property
-    def fullMessage(self):
+    def body(self):
         string = ""
 
         for element in self.data[1:]:
@@ -317,11 +323,11 @@ class Bundle(Sendable):
         sender = bodyMessages[0].sender
         target = bodyMessages[0].target
 
-        bundle = cls(sender, target, code, "")
-
+        bundle = cls(sender, target, code, bodyMessages[0].body)
+        
         # WARNING This classmethod manipulates the object's private
         # data directly
-        [bundle._data.insert(msg) for msg in bodyMessages]
+        [bundle._data.insert(msg) for msg in bodyMessages[1:]]
 
         return bundle
 
@@ -421,10 +427,13 @@ class Connection(object):
 
         self._serial = con
 
+        self._slotmanager = SlotManager()
+
         self._received = TransparentBuffer()
 
-        self.receiverThread = threading.Thread(target=self._continousReadGate, 
-            name="Receiver thread reading from {}".format(self._serial.port),
+        self.receiverThread = threading.Thread(
+            target=self._continousReadGate,
+            name="Receivvalueer thread reading from {}".format(self._serial.port),
             daemon=True)
 
         self.receiverThread.start()
@@ -446,7 +455,8 @@ class Connection(object):
             else:
                 sendable = msg
 
-            self._received.insert(sendable) 
+            self._received.insert(sendable)
+            self._slotmanager(sendable.code, sendable, self)
 
     def _readBundleBody(self, headerMessage):
         data = self._readMessage(int(headerMessage.body))
@@ -477,12 +487,17 @@ class Connection(object):
 
     def _readBody(self, header):
         length = header.length
-        timeout = length * 8 / BIT_PER_SEC
+        timeout = (length * 1.3) * 8 / BIT_PER_SEC
         self._serial.timeout = timeout
 
         rawBody = self._serial.read(length)
         body = rawBody.decode("ascii", "replace")
         return body
+
+    @property
+    def slots(self):
+        return self._slotmanager
+    
 
 # <---------------------------------------------------------------------------------->
 
@@ -492,6 +507,9 @@ class SlotManager(object):
     def __init__(self):
         self._placeholder = lambda msg: None
         self._slots = [self._placeholder for x in range(255)]
+
+        # Bind underhood functions
+        self._slots[1] = _1_BasicText
 
     def __call__(self, slotnum, arg, connection):
         try:
@@ -536,6 +554,11 @@ class SlotManager(object):
     def __repr__(self):
         return self.__class__.__name__ + "()"
 
+# <---------------------------------------------------------------------------------->
+# Underhood functions (the first 32 action code)
+
+def _1_BasicText(msg, conn):
+    print("Text Received:", msg.body)
 
 # <---------------------------------------------------------------------------------->
 
