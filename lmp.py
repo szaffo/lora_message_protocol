@@ -61,7 +61,7 @@ class Queue(object):
     def insert(self, element):
 
         if not issubclass(type(element), self.type):
-            raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
+            raise TypeError("Expected {}, but got {}".format(self.type, type(element)))
 
         self._data.append(element)
 
@@ -92,7 +92,7 @@ class Dequeue(Queue):
 
     def insertFirst(self, element):
         if not issubclass(type(element), self.type):
-            raise QueueNonMatchingType("Expected {}, but got {}".format(self.type, type(element)))
+            raise TypeError("Expected {}, but got {}".format(self.type, type(element)))
 
         self._data.insert(0, element)
 
@@ -557,17 +557,13 @@ class SlotManager(object):
 # <---------------------------------------------------------------------------------->
 # Underhood functions (the first 32 action code)
 
+
 def _1_BasicText(msg, conn):
     print("Text Received:", msg.body)
 
 # <---------------------------------------------------------------------------------->
 
 # Exceptions
-
-
-class QueueNonMatchingType(Exception):
-    pass
-
 
 class QueueIsEmpty(Exception):
     pass
