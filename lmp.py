@@ -487,7 +487,7 @@ class Connection(object):
 # <---------------------------------------------------------------------------------->
 
 
-class TaskManager(object):
+class SlotManager(object):
 
     def __init__(self):
         self._placeholder = lambda msg: None
@@ -503,7 +503,7 @@ class TaskManager(object):
             pass
             # Logging comes here later
 
-    def attachSlot(self, slotnum, func):
+    def bind(self, slotnum, func):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
             raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
 
@@ -515,7 +515,7 @@ class TaskManager(object):
         else:
             raise SlotAlreadyUsedError()
 
-    def detachSlot(self, slotnum):
+    def unbind(self, slotnum):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
             raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
 
