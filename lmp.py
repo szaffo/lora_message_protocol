@@ -22,6 +22,7 @@ BIT_PER_SEC = 300
 BUFFER_SIZE = 512
 PROTOCOL_CODES_NUM = 32
 BUNDLE_HEADER_CODE = 2
+BASIC_TEXT_CODE = 1
 
 # Logger function
 log = print
@@ -291,7 +292,6 @@ class Bundle(Sendable):
     @property
     def code(self):
         return self.data[1].code
-    
 
     @property
     def header(self):
@@ -324,7 +324,7 @@ class Bundle(Sendable):
         target = bodyMessages[0].target
 
         bundle = cls(sender, target, code, bodyMessages[0].body)
-        
+
         # WARNING This classmethod manipulates the object's private
         # data directly
         [bundle._data.insert(msg) for msg in bodyMessages[1:]]
@@ -427,13 +427,15 @@ class Connection(object):
 
         self._serial = con
 
+        self._serialWriteLock = threading.Lock()
+
         self._slotmanager = SlotManager()
 
         self._received = TransparentBuffer()
 
         self.receiverThread = threading.Thread(
             target=self._continousReadGate,
-            name="Receivvalueer thread reading from {}".format(self._serial.port),
+            name="Receiver thread reading from {}".format(self._serial.port),
             daemon=True)
 
         self.receiverThread.start()
@@ -455,7 +457,7 @@ class Connection(object):
             else:
                 sendable = msg
 
-            self._received.insert(sendable)
+            # self._received.insert(sendable)
             self._slotmanager(sendable.code, sendable, self)
 
     def _readBundleBody(self, headerMessage):
@@ -497,7 +499,14 @@ class Connection(object):
     @property
     def slots(self):
         return self._slotmanager
-    
+
+    def send(self, sendable):
+        if not issubclass(type(sendable), Sendable):
+            raise TypeError("Can send only sendables")
+
+        with self._serialWriteLock:
+            self._serial.write(sendable.encode())
+
 
 # <---------------------------------------------------------------------------------->
 
@@ -560,6 +569,16 @@ class SlotManager(object):
 
 def _1_BasicText(msg, conn):
     print("Text Received:", msg.body)
+
+# <---------------------------------------------------------------------------------->
+
+
+def wrapText(text, sender, target):
+    # Wrap any string into sendable
+    s = Message(sender, target, BASIC_TEXT_CODE, text)\
+        if len(text) <= 255 else Bundle(sender, target,  BASIC_TEXT_CODE, text)
+    return s
+
 
 # <---------------------------------------------------------------------------------->
 
