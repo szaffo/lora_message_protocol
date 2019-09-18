@@ -489,7 +489,7 @@ class Connection(object):
 
     def _readBody(self, header):
         length = header.length
-        timeout = (length * 1.3) * 8 / BIT_PER_SEC
+        timeout = (length * 1.5) * 8 / BIT_PER_SEC
         self._serial.timeout = timeout
 
         rawBody = self._serial.read(length)
@@ -506,6 +506,10 @@ class Connection(object):
 
         with self._serialWriteLock:
             self._serial.write(sendable.encode())
+
+
+    def join(self):
+        self.receiverThread.join()
 
 
 # <---------------------------------------------------------------------------------->
