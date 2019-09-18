@@ -23,6 +23,7 @@ BUFFER_SIZE = 512
 PROTOCOL_CODES_NUM = 32
 BUNDLE_HEADER_CODE = 2
 BASIC_TEXT_CODE = 1
+DEVICE_ID = 255
 
 # Logger function
 log = print
@@ -457,8 +458,8 @@ class Connection(object):
             else:
                 sendable = msg
 
-            # self._received.insert(sendable)
-            self._slotmanager(sendable.code, sendable, self)
+            if (sendable.target == DEVICE_ID) or (sendable.target == 0):
+                self._slotmanager(sendable.code, sendable, self)
 
     def _readBundleBody(self, headerMessage):
         data = self._readMessage(int(headerMessage.body))
