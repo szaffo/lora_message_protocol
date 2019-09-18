@@ -24,6 +24,7 @@ PROTOCOL_CODES_NUM = 32
 BUNDLE_HEADER_CODE = 2
 BASIC_TEXT_CODE = 1
 DEVICE_ID = 255
+TIMEOUT_MULTIPLIER = 1.5
 
 # Logger function
 log = print
@@ -490,7 +491,7 @@ class Connection(object):
 
     def _readBody(self, header):
         length = header.length
-        timeout = (length * 1.5) * 8 / BIT_PER_SEC
+        timeout = (length * 8 / BIT_PER_SEC) * TIMEOUT_MULTIPLIER
         self._serial.timeout = timeout
 
         rawBody = self._serial.read(length)
