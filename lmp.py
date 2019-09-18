@@ -188,6 +188,22 @@ class Sendable(object):
     def byteSize(self):
         return len(self.encode("ascii", "replace"))
 
+    @property
+    def code(self):
+        return self.header.code
+
+    @property
+    def length(self):
+        return self.header.length
+
+    @property
+    def target(self):
+        return self.header.target
+
+    @property
+    def sender(self):
+        return self.header.sender
+
 # <---------------------------------------------------------------------------------->
 
 
@@ -221,22 +237,6 @@ class Message(Sendable):
     def body(self):
         # Body stored as string, not bytestring
         return self._body
-
-    @property
-    def code(self):
-        return self.header.code
-
-    @property
-    def length(self):
-        return self.header.length
-
-    @property
-    def target(self):
-        return self.header.target
-
-    @property
-    def sender(self):
-        return self.header.sender
 
     @classmethod
     def joinHeaderWithBody(cls, header, body):
