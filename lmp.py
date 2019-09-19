@@ -509,7 +509,6 @@ class Connection(object):
         with self._serialWriteLock:
             self._serial.write(sendable.encode())
 
-
     def join(self):
         self.receiverThread.join()
 
@@ -538,7 +537,7 @@ class SlotManager(object):
 
     def bind(self, slotnum, func):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
-            raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+            raise IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
 
         if not callable(func):
             raise TaskNotCallableError()
@@ -550,7 +549,7 @@ class SlotManager(object):
 
     def unbind(self, slotnum):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
-            raise IndexError(f"Slots are available from {PROTOCOL_CODES_NUM}-254")
+            raise IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
 
         if self._slots[slotnum] == self._placeholder:
             raise EmptySlotError()
