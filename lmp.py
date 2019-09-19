@@ -2,6 +2,7 @@ import serial
 import textwrap
 import time
 import threading
+import ast
 
 '''
     This protocol can operate with action codes up to 255
@@ -526,14 +527,13 @@ class SlotManager(object):
         self._slots[1] = _1_BasicText
 
     def __call__(self, slotnum, arg, connection):
-        try:
-            if not (slotnum in range(255)):
-                raise IndexError("Slots are available from 0-254")
+        if not (slotnum in range(255)):
+            raise IndexError("Slots are available from 0-254")
 
+        try:
             self._slots[slotnum](arg, connection)
         except Exception as e:
-            pass
-            # Logging comes here later
+            log("SlotManager Error happend while executing task", e)
 
     def bind(self, slotnum, func):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
@@ -574,6 +574,13 @@ class SlotManager(object):
 
 def _1_BasicText(msg, conn):
     print("Text Received:", msg.body)
+
+def _3_ApplyTimeOut(msg, conn):
+    tm = ast.liter_eval(msg.body)
+    if (tm == None) or (type(tm) == float):
+        TIMEOUT_MULTIPLIER = tm
+    else:
+        raise TypeError("TIMEOUT_MULTIPLI excepcted None or float, got {}".format(type(tm)))
 
 # <---------------------------------------------------------------------------------->
 
