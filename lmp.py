@@ -12,8 +12,7 @@ import ast
     First 32 code:
           1 - Basic text
           2 - Bundle header code
-          3 - Asking who got the signal
-          4 - Answer to asking signal
+          3 - Apply new timeout multiplier
 
 '''
 
@@ -404,8 +403,10 @@ class FlowControlledSerial(Serial):
         for current in splitted:
             wTime = len(current) * 8 / BIT_PER_SEC
 
+            log("FlowControlledSerial Writing {} bytes to the serial".format(len(current)))
             counter += super().write(current)
 
+            log("FlowControlledSerial Waiting {} sec to send the written data".format(wTime))
             time.sleep(wTime)
 
         return counter
@@ -434,7 +435,7 @@ class Connection(object):
 
         self._slotmanager = SlotManager()
 
-        self._received = TransparentBuffer()
+        # self._received = TransparentBuffer()
 
         self.receiverThread = threading.Thread(
             target=self._continousReadGate,
@@ -443,40 +444,52 @@ class Connection(object):
 
         self.receiverThread.start()
 
+        log("Connection Initialization done")
+
     def _continousReadGate(self):
+        log("Connection Startin continous read from serial")
         try:
             self._continousRead()
         except Exception as e:
-            log(e)
+            log("Connection An error occured in continous read. Receiving stopped.", e)
 
     def _continousRead(self):
         while True:
             msg = self._readMessage(1)[0]
+            log("Connection Received a new message: " + str(msg))
 
             if msg.code == BUNDLE_HEADER_CODE:
                 messages = self._readBundleBody(msg)
                 # Make bundle from mesages
                 sendable = Bundle.joinMessages(msg, messages)
+                log("Connection Received a new bundle (body not displayed)")
             else:
                 sendable = msg
 
             if (sendable.target == DEVICE_ID) or (sendable.target == 0):
                 self._slotmanager(sendable.code, sendable, self)
+            else:
+                log("Connection Ignore message because it's not sended for this device")
 
     def _readBundleBody(self, headerMessage):
+        log("Connection Reading bundle body")
         data = self._readMessage(int(headerMessage.body))
+        log("Connection Bundle body received")
         return data
 
     def _readMessage(self, num):
         messages = []
+        log("Connection Reading {} messages".format(num))
         while num:
             header = self._readHeader()
             body = self._readBody(header)
 
             if len(body) < header.length:
                 msg = BrokenMessage.joinHeaderWithBody(header, body)
+                log("Connection Message is broken: " + str(msg))
             else:
                 msg = Message.joinHeaderWithBody(header, body)
+                log("Connection Message arrived correctly: " + str(msg))
 
             messages.append(msg)
 
@@ -505,13 +518,32 @@ class Connection(object):
 
     def send(self, sendable):
         if not issubclass(type(sendable), Sendable):
-            raise TypeError("Can send only sendables")
+            raise TypeError("Expected Sendable, got {}".format(type(sendable)))
 
         with self._serialWriteLock:
-            self._serial.write(sendable.encode())
+            byteString = sendable.encode()
+            log("Connection Writing {} to the serial".format(byteString))
+            self._serial.write(byteString)
 
     def join(self):
+        log("Connection Waiting for receiver thread to die")
         self.receiverThread.join()
+
+    @property
+    def deviceID(self):
+        return DEVICE_ID
+
+    @deviceID.setter
+    def deviceID(self, num):
+        if type(num) != int:
+            raise TypeError("Excepted int, got {}".format(type(num)))
+
+        if not (num in range(256)):
+            ValueError("Excepted int in [0-255], got {}".format(num))
+
+        log("Connection New device id is {}".format(num))
+        DEVICE_ID = num
+    
 
 
 # <---------------------------------------------------------------------------------->
@@ -532,6 +564,7 @@ class SlotManager(object):
 
         try:
             self._slots[slotnum](arg, connection)
+            log("SlotManager Slot {} excuted".format(slotnum))
         except Exception as e:
             log("SlotManager Error happend while executing task", e)
 
@@ -540,21 +573,24 @@ class SlotManager(object):
             raise IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
 
         if not callable(func):
-            raise TaskNotCallableError()
+            raise TaskNotCallableError("{} is not callable".format(func))
 
         if self._slots[slotnum] == self._placeholder:
             self._slots[slotnum] = func
+            log("SlotManager Binded {} to slot {}".format(func, slotnum))
         else:
-            raise SlotAlreadyUsedError()
+            raise SlotAlreadyUsedError("{} is already in slot {}".format(self._slots[slotnum], slotnum))
 
     def unbind(self, slotnum):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
             raise IndexError("Slots are available from {}-254".format(PROTOCOL_CODES_NUM))
 
         if self._slots[slotnum] == self._placeholder:
-            raise EmptySlotError()
+            raise EmptySlotErrorr("Slot {} is already empty".format(slotnum))
         else:
+            logText = self._slots[slotnum]
             self._slots[slotnum] = self._placeholder
+            log("SlotManager Unbinded {} from slot {}".format(logText, slotnum))
 
     def isUsed(self, slotnum):
         if not (slotnum in range(255)):
@@ -573,22 +609,32 @@ class SlotManager(object):
 
 
 def _1_BasicText(msg, conn):
-    print("Text Received:", msg.body)
+    log("BASIC_TEXT Text Received:", msg.body)
+
 
 def _3_ApplyTimeOut(msg, conn):
     tm = ast.liter_eval(msg.body)
-    if (tm == None) or (type(tm) == float):
+    if (tm == None) or (type(tm) == float) or (type(tm) == int):
         TIMEOUT_MULTIPLIER = tm
-    else:
-        raise TypeError("TIMEOUT_MULTIPLI excepcted None or float, got {}".format(type(tm)))
+        logText = "None"if tm == None else 100 * tm
+        log("APPLY_TIME_OUT_MULTIPLIER New timeout is {}%".format(logText))
+    else: 
+        log("APPLY_TIME_OUT_MULTIPLIER Can't set new multiplier: " + str(tm))
+        raise TypeError("TIMEOUT_MULTIPLIER excepcted None, float or int, got {}".format(type(tm)))
+
+def _5_Exit(msg, conn):
+    log("EXIT Got an exit call (msg 5)")
+    exit(5)
 
 # <---------------------------------------------------------------------------------->
 
 
 def wrapText(text, sender, target):
     # Wrap any string into sendable
+    log("Wrapper Wrapping text: " + text)
     s = Message(sender, target, BASIC_TEXT_CODE, text)\
         if len(text) <= 255 else Bundle(sender, target,  BASIC_TEXT_CODE, text)
+    log("Wrapper Text wrapped: " + str(s))
     return s
 
 
@@ -638,5 +684,5 @@ class SlotAlreadyUsedError(Exception):
     pass
 
 
-class EmptySlotErro(Exception):
+class EmptySlotError(Exception):
     pass
