@@ -430,6 +430,7 @@ class Connection(object):
             raise NotSerialError("Excepted a Serial object from this library")
 
         self._serial = con
+        log("Connection Using serial: " + str(con))
 
         self._serialWriteLock = threading.Lock()
 
@@ -447,7 +448,7 @@ class Connection(object):
         log("Connection Initialization done")
 
     def _continousReadGate(self):
-        log("Connection Startin continous read from serial")
+        log("Connection Starting continous read from serial")
         try:
             self._continousRead()
         except Exception as e:
@@ -479,7 +480,7 @@ class Connection(object):
 
     def _readMessage(self, num):
         messages = []
-        log("Connection Reading {} messages".format(num))
+        log("Connection Waiting for {} message(s)".format(num))
         while num:
             header = self._readHeader()
             body = self._readBody(header)
@@ -542,8 +543,8 @@ class Connection(object):
             ValueError("Excepted int in [0-255], got {}".format(num))
 
         log("Connection New device id is {}".format(num))
+        global DEVICE_ID
         DEVICE_ID = num
-    
 
 
 # <---------------------------------------------------------------------------------->
@@ -552,11 +553,13 @@ class Connection(object):
 class SlotManager(object):
 
     def __init__(self):
-        self._placeholder = lambda msg: None
+        self._placeholder = lambda msg, conn: None
         self._slots = [self._placeholder for x in range(255)]
 
         # Bind underhood functions
         self._slots[1] = _1_BasicText
+        self._slots[3] = _3_ApplyTimeOut
+        self._slots[5] = _5_Exit
 
     def __call__(self, slotnum, arg, connection):
         if not (slotnum in range(255)):
@@ -566,7 +569,7 @@ class SlotManager(object):
             self._slots[slotnum](arg, connection)
             log("SlotManager Slot {} excuted".format(slotnum))
         except Exception as e:
-            log("SlotManager Error happend while executing task", e)
+            log("SlotManager Error happend while executing slot {}".format(slotnum), e)
 
     def bind(self, slotnum, func):
         if not (slotnum in range(PROTOCOL_CODES_NUM, 255)):
@@ -613,14 +616,15 @@ def _1_BasicText(msg, conn):
 
 
 def _3_ApplyTimeOut(msg, conn):
-    tm = ast.liter_eval(msg.body)
+    tm = ast.literal_eval(msg.body)
     if (tm == None) or (type(tm) == float) or (type(tm) == int):
         TIMEOUT_MULTIPLIER = tm
         logText = "None"if tm == None else 100 * tm
         log("APPLY_TIME_OUT_MULTIPLIER New timeout is {}%".format(logText))
-    else: 
+    else:
         log("APPLY_TIME_OUT_MULTIPLIER Can't set new multiplier: " + str(tm))
         raise TypeError("TIMEOUT_MULTIPLIER excepcted None, float or int, got {}".format(type(tm)))
+
 
 def _5_Exit(msg, conn):
     log("EXIT Got an exit call (msg 5)")
